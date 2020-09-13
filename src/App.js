@@ -39,7 +39,11 @@ export default class App extends Component {
     this.GetData = this.GetData.bind(this);
     this.filterData = this.filterData.bind(this);
     this.onNameChange = this.onNameChange.bind(this);
-    this.onStatusChange = this.onStatusChange.bind(this);
+    this.onStatusChange = this.onStatusChange.bind(this); 
+    this.onDateFromChange = this.onDateFromChange.bind(this); 
+    this.onDateToChange = this.onDateToChange.bind(this); 
+    this.setFilterData = this.setFilterData.bind(this); 
+    this.onFilterClear = this.onFilterClear.bind(this);
   }
 
   setPage(value) {
@@ -80,7 +84,7 @@ export default class App extends Component {
   }
 
   createRow(i) {
-    var row = { Id: i, LogFileName: "" + i, MobileDomain: "" + i, Branch: "" + i, OperationName: "" + i, Status: "" + i, Category: "" + i, ExceptionType: "" + i, StartTime: "" + i, EndTime: "" + i, Duration: "" + i, Input: "input" + i, Output: "output" + i }
+    var row = { Id: i, LogFileName: "" + i, MobileDomain: "" + i, Branch: "" + i, OperationName: "" + i, Status: "" + i, Category: "" + i, ExceptionType: "" + i, StartTime: this.startRandomDate().toDateString(), EndTime: this.endRandomDate().toDateString(), Duration: "" + i, Input: "input" + i, Output: "output" + i }
     return row;
   }
 
@@ -118,6 +122,20 @@ export default class App extends Component {
     });
   }
 
+  onDateFromChange(event)
+  {
+    this.setState({
+      tempDateFrom: event.target.value
+    });
+  }
+
+  onDateToChange(event)
+  {
+    this.setState({
+      tempDateTo: event.target.value
+    },
+    );
+  }
   onStatusChange(event)
   {
     this.setState({
@@ -125,24 +143,68 @@ export default class App extends Component {
     });
   }
 
-  filterData() {
+  onFilterClear() 
+  {
     this.setState({
-      nameFilter: this.state.tempName,
-      stateFilter: this.state.tempStatus
-    });
+      tempStatus: "",
+      tempName: "",
+      tempDateFrom: "",
+      tempDateTo: "",
+      nameFilter: "",
+      statusFilter: "",
+      dateToFilter: "",
+      dateFromFilter: "",
+      filteredData: this.state.data,
+      page: 0
+    },
+    this.forceUpdate());
+  }
+
+
+  filterData() {
     var filtered = [];
     var row;
     for(var i = 0; i < this.state.data.length; i++)
     {
       row = this.state.data[i];
-      if ((!this.state.nameFilter || this.state.nameFilter == "" || row.LogFileName.includes(this.state.nameFilter)) && (!this.state.statusFilter || this.state.statusFilter == "" || row.status.includes(this.state.statusFilter)))
+      if ((!this.state.nameFilter || this.state.nameFilter == "" || row.LogFileName.includes(this.state.nameFilter)) && 
+      (!this.state.statusFilter || this.state.statusFilter == "" || row.Status.includes(this.state.statusFilter)) && 
+      (!this.state.dateFromFilter || Date.parse(this.state.dateFromFilter) <= Date.parse(row.StartTime)) &&
+      (!this.state.dateToFilter || Date.parse(this.state.dateToFilter) >= Date.parse(row.EndTime)))
         filtered.push(row);
     }
     this.setState({
       filteredData: filtered,
       page: 0
-    });
+    },
+    this.forceUpdate
+    );
   }
+
+  setFilterData() {
+    this.setState({
+      nameFilter: this.state.tempName,
+      statusFilter: this.state.tempStatus,
+      dateFromFilter: this.state.tempDateFrom,
+      dateToFilter: this.state.tempDateTo
+    },
+    this.filterData);
+  }
+
+
+
+startRandomDate() {
+    var start = new Date(2001, 0, 1);
+    var end = new Date(2005, 0, 5);
+    return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+}
+
+endRandomDate() {
+  var start = new Date(2010, 0, 1);
+  var end = new Date(2020, 0, 5);
+  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+}
+ 
 
   isSelected = (id) => this.state.selected == id;
 
@@ -165,9 +227,10 @@ export default class App extends Component {
               <a class="element">
                 <TextField
                   id="dateFrom"
-                  type="date"
+                  type="datetime-local"
                   label="czas od"
-                  defaultValue=""
+                  value={this.state.tempDateFrom}
+                  onChange= {this.onDateFromChange}
                   InputLabelProps={{
                     shrink: true,
                   }}
@@ -178,6 +241,7 @@ export default class App extends Component {
                   id="user"
                   type="text"
                   label="użytkownik"
+                  value={this.state.tempName}
                   onChange={this.onNameChange}
                   defaultValue=""
                   InputLabelProps={{
@@ -190,9 +254,10 @@ export default class App extends Component {
               <a class="element">
                 <TextField
                   id="dateTo"
-                  type="date"
+                  type="datetime-local"
                   label="czas do"
-                  defaultValue=""
+                  value={this.state.tempDateTo}
+                  onChange= {this.onDateToChange}
                   InputLabelProps={{
                     shrink: true,
                   }}
@@ -203,6 +268,7 @@ export default class App extends Component {
                   id="state"
                   type="text"
                   label="status"
+                  value={this.state.tempStatus}
                   onChange={this.onStatusChange}
                   defaultValue=""
                   InputLabelProps={{
@@ -211,7 +277,8 @@ export default class App extends Component {
                 />
               </a>
               <div class="element">
-                <Button style={{ padding: 5 }} onClick = {this.filterData}>filtruj</Button>
+                <Button style={{ padding: 5 }} onClick = {this.setFilterData}>filtruj</Button> 
+                <Button style={{ padding: 5 }} onClick = {this.onFilterClear}>wyczyść</Button>
               </div>
             </div>
           </div>
