@@ -1,134 +1,209 @@
 import React, { Component } from 'react';
-import FilterForm from './components/FilterForm/filterForm';
-import DataTable from './components/DataTable/dataTable';
-import XMLFields from './components/XMLFields/XMLFields';
 import './App.css';
 import { makeStyles } from '@material-ui/core/styles';
+import { createMuiTheme, ThemeProvider } from '@material-ui/core/styles';
+import { plPL } from '@material-ui/core/locale';
 import {
-  Button, Box, TextField,
+  Button, TextField,
   Accordion, AccordionSummary, AccordionDetails,
   Table, Paper, TableCell, TableContainer, TableHead, TableRow, TableBody, TablePagination, TableFooter
 } from '@material-ui/core';
-
-
-const xmlone = "<note><to>Tove</to><from>Jani</from><heading>Reminder</heading><body>Don't forget me this weekend!</body></note>";
-const xmltwo = "<note><to>Tove</to><from>Jani</from><heading>Reminder</heading><body>Don't forget me next weekend!</body></note>";
+//style for the table
 const useStyles = makeStyles({
   table: {
     minWidth: 650,
   },
 });
-
+//theme showing the default translation option (polish)
+const theme = createMuiTheme({}, plPL);
 const classes = useStyles;
 
 
 export default class App extends Component {
-  dataTable;
   constructor(props) {
-
     super(props);
     this.state = {
+      //fetched row data
       data: [{}],
-      filteredData: [{}],
+      //how many rows per one page of the table
       rowsPerPage: 5,
+      //which page of the table are we on
       page: 0,
       nameFilter: "",
       statusFilter: ""
     }
-    this.GetData();
-    this.GetData = this.GetData.bind(this);
-    this.filterData = this.filterData.bind(this);
+    this.getData();
+    this.getData = this.getData.bind(this);
     this.onNameChange = this.onNameChange.bind(this);
     this.onStatusChange = this.onStatusChange.bind(this); 
     this.onDateFromChange = this.onDateFromChange.bind(this); 
     this.onDateToChange = this.onDateToChange.bind(this); 
     this.setFilterData = this.setFilterData.bind(this); 
     this.onFilterClear = this.onFilterClear.bind(this);
+    this.setRowsPerPage = this.setRowsPerPage.bind(this);
+    this.setPage = this.setPage.bind(this);
+    this.getOutputOfXml = this.getOutputOfXml.bind(this);
   }
 
+  //set the value of page, then fetch needed rows
   setPage(value) {
     this.setState({
       page: value
-    })
+    }, this.getData);
   }
 
+  //set the value of rowsPerPage, then fetch needed rows
   setRowsPerPage(value) {
     this.setState({
       rowsPerPage: value
-    })
+    }, this.getData);
   }
 
-  async GetData() {
+  //fetch data by building an SQL query and sending it to the server
+  async getData() { 
     try {
+      var data = this.buildQuery();
       const response = await fetch("http://localhost:8080/list", {
-        method: "GET",
+        method: "POST",
         credentials: 'same-origin',
-        headers: { 'Content-type': 'text/plain' }
+        headers: { 'Content-type': 'text/plain' },
+        body: JSON.stringify(data)
       });
       const json = await response.json();
       this.setState({
         data: json.recordset,
         selected: -1
-      });
+      }, this.forceUpdate);
     }
-    catch {
-      var dat = this.createData(100);
-      this.setState({
-        data: dat,
-        selected: -1
-      });
+    //catch an error and display it
+    catch(err) {
+      console.error(err);
     }
+  }
+
+  //build a query with filters and pagination
+  buildQuery() {
+    //basic query
+    var objectQuery = "SELECT * FROM dbo.LogHeader ";
+    //have we added a "WHERE" statement in the sql yet?
+    var whereAdded = false;
+    var filter = "";
+    if(this.state.nameFilter && this.state.nameFilter != "")
+      {
+        filter += this.addFilterStartToQuery(whereAdded) + "CHARINDEX('" + this.state.nameFilter + "', MobileUserId) > 0 "
+        whereAdded = true;
+      }
+      if(this.state.statusFilter && this.state.nameFilter != "")
+      {
+        filter += this.addFilterStartToQuery(whereAdded) + "CHARINDEX('" + this.state.statusFilter + "', Status) > 0 "
+        whereAdded = true;
+      }
+      if(this.state.dateFromFilter && this.state.dateFromFilter != "")
+      {
+        //cast AuditDate to miliseconds so it can be checked with our date filter
+        filter += this.addFilterStartToQuery(whereAdded) + "cast(DATEDIFF(s, '19700101', cast(AuditDate as datetime)) as bigint) * 1000 >= " + Date.parse(this.state.dateFromFilter) + " ";
+        whereAdded = true;
+      }
+      if(this.state.dateToFilter && this.state.dateToFilter != "")
+      {
+        filter += this.addFilterStartToQuery(whereAdded) + "cast(DATEDIFF(s, '19700101', cast(AuditDate as datetime)) as bigint) * 1000 <= " + Date.parse(this.state.dateToFilter) + " ";
+        whereAdded = true;
+      }
+      //if we had any filters, add it to the main query
+      if(whereAdded)
+        objectQuery += filter;
+      //add pagination
+      objectQuery += "ORDER BY MobileUserId OFFSET " + this.state.rowsPerPage * this.state.page + " ROWS FETCH NEXT " + this.state.rowsPerPage +" ROWS ONLY";
+    return {query: objectQuery};
+  }
+
+  //parse the input XML, then get the fetch data from it
+  async getOutputOfXml(xml)
+  {
+    var output = "";
+    //read from xml and get all the requests
+    //output += await this.fetchData();
+    var parser = new DOMParser();
+    var xmlDoc = parser.parseFromString(xml,"text/xml");
+    var inputs = xmlDoc.getElementsByTagName("Inputs")[0];
+    var anytype = xmlDoc.getElementsByTagName("anyType");
+    for(var i = 0; i < anytype.length; i++)
+    {
+      output += await this.fetchData(anytype[i].attributes[0].textContent, anytype[i].attributes[1].textContent, anytype[i].childNodes[0].nodeValue);
+    }
+    //if output is undefined, just change to an empty string
+    if(output == undefined)
+      output = "";
+      //set the output state and refresh the page
+    output = "<OUTPUT>" + output + "</OUTPUT>";
     this.setState({
-      filteredData: this.state.data
-    })
+      output: output
+    }, this.forceUpdate);
   }
 
-  createRow(i) {
-    var row = { Id: i, LogFileName: "" + i, MobileDomain: "" + i, Branch: "" + i, OperationName: "" + i, Status: "" + i, Category: "" + i, ExceptionType: "" + i, StartTime: this.startRandomDate().toDateString(), EndTime: this.endRandomDate().toDateString(), Duration: "" + i, Input: "input" + i, Output: "output" + i }
-    return row;
+//fetch data as text with a certain value, type and link 
+async fetchData(link, type, value)
+{
+  try {
+    const response = await fetch(link, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { 'Content-type': type },
+      body: value
+    });
+    return await response.body;
   }
+  catch(err) {
+    console.error(err);
+  }
+}
 
-  createData(j) {
-    var datas = [];
-    for (var i = 0; i < j; i++) {
-      datas.push(this.createRow(i));
+//add either WHERE or AND to the filter query
+  addFilterStartToQuery(firstAdded)
+  {
+    if(!firstAdded)
+    {
+      return "WHERE "
     }
-    return datas;
+    return "AND "
   }
 
-
+  //event handler for changing the page in the ui
   handleChangePage = (event, newPage) => {
     this.setPage(newPage);
   };
 
+  //event handler for changing the number of rows on one page in the ui
   handleChangeRowsPerPage = (event) => {
     this.setRowsPerPage(parseInt(event.target.value, 10));
     this.setPage(0);
   };
 
-  handleClick = (event, Id, Input, Output) => {
+  //handler for clicking a table row
+  handleClick = (event, Id, Input) => {
     this.setState({
       input: Input,
-      output: Output,
       selected: Id
     });
+    this.getOutputOfXml(Input);
     this.forceUpdate();
   }
 
+  //handler for changing filter name
   onNameChange(event)
   {
     this.setState({
       tempName: event.target.value
     });
   }
-
+  //handler for changing filter DateFrom
   onDateFromChange(event)
   {
     this.setState({
       tempDateFrom: event.target.value
     });
   }
-
+  //handler for changing filter DateTo
   onDateToChange(event)
   {
     this.setState({
@@ -136,13 +211,14 @@ export default class App extends Component {
     },
     );
   }
+  //handler for changing filter Status
   onStatusChange(event)
   {
     this.setState({
      tempStatus: event.target.value
     });
   }
-
+  //handler for clearing the filters
   onFilterClear() 
   {
     this.setState({
@@ -154,33 +230,11 @@ export default class App extends Component {
       statusFilter: "",
       dateToFilter: "",
       dateFromFilter: "",
-      filteredData: this.state.data,
       page: 0
     },
-    this.forceUpdate());
+    this.getData);
   }
-
-
-  filterData() {
-    var filtered = [];
-    var row;
-    for(var i = 0; i < this.state.data.length; i++)
-    {
-      row = this.state.data[i];
-      if ((!this.state.nameFilter || this.state.nameFilter == "" || row.LogFileName.includes(this.state.nameFilter)) && 
-      (!this.state.statusFilter || this.state.statusFilter == "" || row.Status.includes(this.state.statusFilter)) && 
-      (!this.state.dateFromFilter || Date.parse(this.state.dateFromFilter) <= Date.parse(row.StartTime)) &&
-      (!this.state.dateToFilter || Date.parse(this.state.dateToFilter) >= Date.parse(row.EndTime)))
-        filtered.push(row);
-    }
-    this.setState({
-      filteredData: filtered,
-      page: 0
-    },
-    this.forceUpdate
-    );
-  }
-
+  //handler for setting the filter data, and fetching filtered rows
   setFilterData() {
     this.setState({
       nameFilter: this.state.tempName,
@@ -188,29 +242,15 @@ export default class App extends Component {
       dateFromFilter: this.state.tempDateFrom,
       dateToFilter: this.state.tempDateTo
     },
-    this.filterData);
+    this.getData);
   }
 
-
-
-startRandomDate() {
-    var start = new Date(2001, 0, 1);
-    var end = new Date(2005, 0, 5);
-    return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
-}
-
-endRandomDate() {
-  var start = new Date(2010, 0, 1);
-  var end = new Date(2020, 0, 5);
-  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
-}
- 
-
-  isSelected = (id) => this.state.selected == id;
+isSelected = (id) => this.state.selected == id;
 
   render() {
     return (
       <React.Fragment>
+        <ThemeProvider theme={theme}>
         <div className="App-content">
           <div className="App-panel">
             <header>
@@ -297,27 +337,29 @@ endRandomDate() {
                     <TableCell align="right">Operation Status</TableCell>
                     <TableCell align="right">Operation Category</TableCell>
                     <TableCell align="right">Exception Type</TableCell>
+                    <TableCell align="right">Exception Name</TableCell>
                     <TableCell align="right">Start Time</TableCell>
                     <TableCell align="right">End Time</TableCell>
                     <TableCell align="right">Duration Time</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {this.state.filteredData.slice(this.state.page * this.state.rowsPerPage, this.state.page * this.state.rowsPerPage + this.state.rowsPerPage).map((row, index) => {
+                  {this.state.data.map((row, index) => {
                     const isItemSelected = this.isSelected(row.Id)
                       return (
                         <TableRow
                           hover
                           key={row.Id}
-                          onClick={(event) => this.handleClick(event, row.Id, row.Input, row.Output)}
+                          onClick={(event) => this.handleClick(event, row.Id, row.Inputs, row.Output)}
                           selected={isItemSelected}>
-                          <TableCell component="th" scope="row" align = "right">{row.LogFileName}</TableCell>
+                          <TableCell component="th" scope="row" align = "right">{row.MobileUserId}</TableCell>
                           <TableCell align="right">{row.MobileDomain}</TableCell>
                           <TableCell align="right">{row.Branch}</TableCell>
                           <TableCell align="right">{row.OperationName}</TableCell>
                           <TableCell align="right">{row.Status}</TableCell>
                           <TableCell align="right">{row.Category}</TableCell>
                           <TableCell align="right">{row.ExceptionType}</TableCell>
+                          <TableCell align="right">{row.ExceptionMessage}</TableCell>
                           <TableCell align="right">{row.StartTime}</TableCell>
                           <TableCell align="right">{row.EndTime}</TableCell>
                           <TableCell align="right">{row.Duration}</TableCell>
@@ -328,11 +370,12 @@ endRandomDate() {
                 <TableFooter>
                   <TablePagination
                     rowsPerPageOptions={[5, 10, 25]}
-                    count={this.state.filteredData.length}
                     rowsPerPage={this.state.rowsPerPage}
                     page={this.state.page}
+                    count={-1}
                     onChangePage={this.handleChangePage}
                     onChangeRowsPerPage={this.handleChangeRowsPerPage}
+                    labelDisplayedRows = {({ from, to, count }) => "" + from + "-" + to + " z " + (count==-1?"więcej niż " + to:count) + ""}
                   />
                 </TableFooter>
               </Table>
@@ -340,23 +383,16 @@ endRandomDate() {
           </div>
           <div className='rowC'>
             <a class="App-panel">
-              <Accordion expanded={true}>
-                <AccordionSummary>INPUT XML</AccordionSummary>
-                <AccordionDetails>
+                <h2>INPUT XML</h2>
                   <code>{this.state.input}</code>
-                </AccordionDetails>
-              </Accordion>
             </a>
             <a class="App-panel">
-              <Accordion expanded={true}>
-                <AccordionSummary>OUTPUT XML</AccordionSummary>
-                <AccordionDetails>
+                <h2>OUTPUT XML</h2>
                   <code>{this.state.output}</code>
-                </AccordionDetails>
-              </Accordion>
             </a>
           </div>
         </div>
+        </ThemeProvider>
       </React.Fragment>
     );
   }
