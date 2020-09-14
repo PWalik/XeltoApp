@@ -35,10 +35,10 @@ export default class App extends Component {
     this.getData();
     this.getData = this.getData.bind(this);
     this.onNameChange = this.onNameChange.bind(this);
-    this.onStatusChange = this.onStatusChange.bind(this); 
-    this.onDateFromChange = this.onDateFromChange.bind(this); 
-    this.onDateToChange = this.onDateToChange.bind(this); 
-    this.setFilterData = this.setFilterData.bind(this); 
+    this.onStatusChange = this.onStatusChange.bind(this);
+    this.onDateFromChange = this.onDateFromChange.bind(this);
+    this.onDateToChange = this.onDateToChange.bind(this);
+    this.setFilterData = this.setFilterData.bind(this);
     this.onFilterClear = this.onFilterClear.bind(this);
     this.setRowsPerPage = this.setRowsPerPage.bind(this);
     this.setPage = this.setPage.bind(this);
@@ -60,7 +60,7 @@ export default class App extends Component {
   }
 
   //fetch data by building an SQL query and sending it to the server
-  async getData() { 
+  async getData() {
     try {
       var data = this.buildQuery();
       const response = await fetch("http://localhost:8080/list", {
@@ -76,7 +76,7 @@ export default class App extends Component {
       }, this.forceUpdate);
     }
     //catch an error and display it
-    catch(err) {
+    catch (err) {
       console.error(err);
     }
   }
@@ -88,81 +88,72 @@ export default class App extends Component {
     //have we added a "WHERE" statement in the sql yet?
     var whereAdded = false;
     var filter = "";
-    if(this.state.nameFilter && this.state.nameFilter != "")
-      {
-        filter += this.addFilterStartToQuery(whereAdded) + "CHARINDEX('" + this.state.nameFilter + "', MobileUserId) > 0 "
-        whereAdded = true;
-      }
-      if(this.state.statusFilter && this.state.nameFilter != "")
-      {
-        filter += this.addFilterStartToQuery(whereAdded) + "CHARINDEX('" + this.state.statusFilter + "', Status) > 0 "
-        whereAdded = true;
-      }
-      if(this.state.dateFromFilter && this.state.dateFromFilter != "")
-      {
-        //cast AuditDate to miliseconds so it can be checked with our date filter
-        filter += this.addFilterStartToQuery(whereAdded) + "cast(DATEDIFF(s, '19700101', cast(AuditDate as datetime)) as bigint) * 1000 >= " + Date.parse(this.state.dateFromFilter) + " ";
-        whereAdded = true;
-      }
-      if(this.state.dateToFilter && this.state.dateToFilter != "")
-      {
-        filter += this.addFilterStartToQuery(whereAdded) + "cast(DATEDIFF(s, '19700101', cast(AuditDate as datetime)) as bigint) * 1000 <= " + Date.parse(this.state.dateToFilter) + " ";
-        whereAdded = true;
-      }
-      //if we had any filters, add it to the main query
-      if(whereAdded)
-        objectQuery += filter;
-      //add pagination
-      objectQuery += "ORDER BY MobileUserId OFFSET " + this.state.rowsPerPage * this.state.page + " ROWS FETCH NEXT " + this.state.rowsPerPage +" ROWS ONLY";
-    return {query: objectQuery};
+    if (this.state.nameFilter && this.state.nameFilter != "") {
+      filter += this.addFilterStartToQuery(whereAdded) + "CHARINDEX('" + this.state.nameFilter + "', MobileUserId) > 0 "
+      whereAdded = true;
+    }
+    if (this.state.statusFilter && this.state.nameFilter != "") {
+      filter += this.addFilterStartToQuery(whereAdded) + "CHARINDEX('" + this.state.statusFilter + "', Status) > 0 "
+      whereAdded = true;
+    }
+    if (this.state.dateFromFilter && this.state.dateFromFilter != "") {
+      //cast AuditDate to miliseconds so it can be checked with our date filter
+      filter += this.addFilterStartToQuery(whereAdded) + "cast(DATEDIFF(s, '19700101', cast(AuditDate as datetime)) as bigint) * 1000 >= " + Date.parse(this.state.dateFromFilter) + " ";
+      whereAdded = true;
+    }
+    if (this.state.dateToFilter && this.state.dateToFilter != "") {
+      filter += this.addFilterStartToQuery(whereAdded) + "cast(DATEDIFF(s, '19700101', cast(AuditDate as datetime)) as bigint) * 1000 <= " + Date.parse(this.state.dateToFilter) + " ";
+      whereAdded = true;
+    }
+    //if we had any filters, add it to the main query
+    if (whereAdded)
+      objectQuery += filter;
+    //add pagination
+    objectQuery += "ORDER BY MobileUserId OFFSET " + this.state.rowsPerPage * this.state.page + " ROWS FETCH NEXT " + this.state.rowsPerPage + " ROWS ONLY";
+    return { query: objectQuery };
   }
 
   //parse the input XML, then get the fetch data from it
-  async getOutputOfXml(xml)
-  {
+  async getOutputOfXml(xml) {
     var output = "";
     //read from xml and get all the requests
     //output += await this.fetchData();
     var parser = new DOMParser();
-    var xmlDoc = parser.parseFromString(xml,"text/xml");
+    var xmlDoc = parser.parseFromString(xml, "text/xml");
     var inputs = xmlDoc.getElementsByTagName("Inputs")[0];
     var anytype = xmlDoc.getElementsByTagName("anyType");
-    for(var i = 0; i < anytype.length; i++)
-    {
+    for (var i = 0; i < anytype.length; i++) {
       output += await this.fetchData(anytype[i].attributes[0].textContent, anytype[i].attributes[1].textContent, anytype[i].childNodes[0].nodeValue);
     }
     //if output is undefined, just change to an empty string
-    if(output == undefined)
+    if (output == undefined)
       output = "";
-      //set the output state and refresh the page
+    //set the output state and refresh the page
     output = "<OUTPUT>" + output + "</OUTPUT>";
     this.setState({
       output: output
     }, this.forceUpdate);
   }
 
-//fetch data as text with a certain value, type and link 
-async fetchData(link, type, value)
-{
-  try {
-    const response = await fetch(link, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { 'Content-type': type },
-      body: value
-    });
-    return await response.body;
+  //fetch data as text with a certain value, type and link 
+  async fetchData(link, type, value) {
+    try {
+      const response = await fetch(link, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { 'Content-type': type },
+        body: value
+      });
+      return await response.body;
+    }
+    catch (err) {
+      console.error(err);
+    }
   }
-  catch(err) {
-    console.error(err);
-  }
-}
 
-//add either WHERE or AND to the filter query
-  addFilterStartToQuery(firstAdded)
-  {
-    if(!firstAdded)
-    {
+  //add either WHERE or AND to the filter query
+  addFilterStartToQuery(firstAdded) {
+    if (!firstAdded) {
       return "WHERE "
     }
     return "AND "
@@ -190,37 +181,32 @@ async fetchData(link, type, value)
   }
 
   //handler for changing filter name
-  onNameChange(event)
-  {
+  onNameChange(event) {
     this.setState({
       tempName: event.target.value
     });
   }
   //handler for changing filter DateFrom
-  onDateFromChange(event)
-  {
+  onDateFromChange(event) {
     this.setState({
       tempDateFrom: event.target.value
     });
   }
   //handler for changing filter DateTo
-  onDateToChange(event)
-  {
+  onDateToChange(event) {
     this.setState({
       tempDateTo: event.target.value
     },
     );
   }
   //handler for changing filter Status
-  onStatusChange(event)
-  {
+  onStatusChange(event) {
     this.setState({
-     tempStatus: event.target.value
+      tempStatus: event.target.value
     });
   }
   //handler for clearing the filters
-  onFilterClear() 
-  {
+  onFilterClear() {
     this.setState({
       tempStatus: "",
       tempName: "",
@@ -232,7 +218,7 @@ async fetchData(link, type, value)
       dateFromFilter: "",
       page: 0
     },
-    this.getData);
+      this.getData);
   }
   //handler for setting the filter data, and fetching filtered rows
   setFilterData() {
@@ -242,117 +228,117 @@ async fetchData(link, type, value)
       dateFromFilter: this.state.tempDateFrom,
       dateToFilter: this.state.tempDateTo
     },
-    this.getData);
+      this.getData);
   }
 
-isSelected = (id) => this.state.selected == id;
+  isSelected = (id) => this.state.selected == id;
 
   render() {
     return (
       <React.Fragment>
         <ThemeProvider theme={theme}>
-        <div className="App-content">
-          <div className="App-panel">
-            <header>
-              <h1>Zadanie testowe Xalto</h1>
-              <h2 style={{ textAlign: "center" }}>Patryk Walicki</h2>
-            </header>
-          </div>
-          <div className="App-panel">
-          <Accordion>
-        <AccordionSummary>Filtruj tabelę</AccordionSummary>
-        <AccordionDetails>
-          <div class="Filter-panel">
-            <div>
-              <a class="element">
-                <TextField
-                  id="dateFrom"
-                  type="datetime-local"
-                  label="czas od"
-                  value={this.state.tempDateFrom}
-                  onChange= {this.onDateFromChange}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                />
-              </a>
-              <a class="element">
-                <TextField
-                  id="user"
-                  type="text"
-                  label="użytkownik"
-                  value={this.state.tempName}
-                  onChange={this.onNameChange}
-                  defaultValue=""
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                />
-              </a>
+          <div className="App-content">
+            <div className="App-panel">
+              <header>
+                <h1>Zadanie testowe Xalto</h1>
+                <h2 style={{ textAlign: "center" }}>Patryk Walicki</h2>
+              </header>
             </div>
-            <div>
-              <a class="element">
-                <TextField
-                  id="dateTo"
-                  type="datetime-local"
-                  label="czas do"
-                  value={this.state.tempDateTo}
-                  onChange= {this.onDateToChange}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                />
-              </a>
-              <a class="element">
-                <TextField
-                  id="state"
-                  type="text"
-                  label="status"
-                  value={this.state.tempStatus}
-                  onChange={this.onStatusChange}
-                  defaultValue=""
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                />
-              </a>
-              <div class="element">
-                <Button style={{ padding: 5 }} onClick = {this.setFilterData}>filtruj</Button> 
-                <Button style={{ padding: 5 }} onClick = {this.onFilterClear}>wyczyść</Button>
-              </div>
+            <div className="App-panel">
+              <Accordion>
+                <AccordionSummary>Filtruj tabelę</AccordionSummary>
+                <AccordionDetails>
+                  <div class="Filter-panel">
+                    <div>
+                      <a class="element">
+                        <TextField
+                          id="dateFrom"
+                          type="datetime-local"
+                          label="czas od"
+                          value={this.state.tempDateFrom}
+                          onChange={this.onDateFromChange}
+                          InputLabelProps={{
+                            shrink: true,
+                          }}
+                        />
+                      </a>
+                      <a class="element">
+                        <TextField
+                          id="user"
+                          type="text"
+                          label="użytkownik"
+                          value={this.state.tempName}
+                          onChange={this.onNameChange}
+                          defaultValue=""
+                          InputLabelProps={{
+                            shrink: true,
+                          }}
+                        />
+                      </a>
+                    </div>
+                    <div>
+                      <a class="element">
+                        <TextField
+                          id="dateTo"
+                          type="datetime-local"
+                          label="czas do"
+                          value={this.state.tempDateTo}
+                          onChange={this.onDateToChange}
+                          InputLabelProps={{
+                            shrink: true,
+                          }}
+                        />
+                      </a>
+                      <a class="element">
+                        <TextField
+                          id="state"
+                          type="text"
+                          label="status"
+                          value={this.state.tempStatus}
+                          onChange={this.onStatusChange}
+                          defaultValue=""
+                          InputLabelProps={{
+                            shrink: true,
+                          }}
+                        />
+                      </a>
+                      <div class="element">
+                        <Button style={{ padding: 5 }} onClick={this.setFilterData}>filtruj</Button>
+                        <Button style={{ padding: 5 }} onClick={this.onFilterClear}>wyczyść</Button>
+                      </div>
+                    </div>
+                  </div>
+                </AccordionDetails>
+              </Accordion>
             </div>
-          </div>
-        </AccordionDetails>
-      </Accordion>
-          </div>
-          <div className="App-panel">
-            <TableContainer component={Paper}>
-              <Table className={classes.table} aria-label="simple table">
-                <TableHead>
-                  <TableRow>
-                    <TableCell align="right">Użytkownik</TableCell>
-                    <TableCell align="right">Domena</TableCell>
-                    <TableCell align="right">Magazyn</TableCell>
-                    <TableCell align="right">Operation Name</TableCell>
-                    <TableCell align="right">Operation Status</TableCell>
-                    <TableCell align="right">Operation Category</TableCell>
-                    <TableCell align="right">Exception Type</TableCell>
-                    <TableCell align="right">Exception Name</TableCell>
-                    <TableCell align="right">Start Time</TableCell>
-                    <TableCell align="right">End Time</TableCell>
-                    <TableCell align="right">Duration Time</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {this.state.data.map((row, index) => {
-                    const isItemSelected = this.isSelected(row.Id)
+            <div className="App-panel">
+              <TableContainer component={Paper}>
+                <Table className={classes.table} aria-label="simple table">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell align="right">Użytkownik</TableCell>
+                      <TableCell align="right">Domena</TableCell>
+                      <TableCell align="right">Magazyn</TableCell>
+                      <TableCell align="right">Operation Name</TableCell>
+                      <TableCell align="right">Operation Status</TableCell>
+                      <TableCell align="right">Operation Category</TableCell>
+                      <TableCell align="right">Exception Type</TableCell>
+                      <TableCell align="right">Exception Name</TableCell>
+                      <TableCell align="right">Start Time</TableCell>
+                      <TableCell align="right">End Time</TableCell>
+                      <TableCell align="right">Duration Time</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {this.state.data.map((row, index) => {
+                      const isItemSelected = this.isSelected(row.Id)
                       return (
                         <TableRow
                           hover
                           key={row.Id}
                           onClick={(event) => this.handleClick(event, row.Id, row.Inputs, row.Output)}
                           selected={isItemSelected}>
-                          <TableCell component="th" scope="row" align = "right">{row.MobileUserId}</TableCell>
+                          <TableCell component="th" scope="row" align="right">{row.MobileUserId}</TableCell>
                           <TableCell align="right">{row.MobileDomain}</TableCell>
                           <TableCell align="right">{row.Branch}</TableCell>
                           <TableCell align="right">{row.OperationName}</TableCell>
@@ -365,33 +351,33 @@ isSelected = (id) => this.state.selected == id;
                           <TableCell align="right">{row.Duration}</TableCell>
                         </TableRow>
                       )
-                  })}
-                </TableBody>
-                <TableFooter>
-                  <TablePagination
-                    rowsPerPageOptions={[5, 10, 25]}
-                    rowsPerPage={this.state.rowsPerPage}
-                    page={this.state.page}
-                    count={-1}
-                    onChangePage={this.handleChangePage}
-                    onChangeRowsPerPage={this.handleChangeRowsPerPage}
-                    labelDisplayedRows = {({ from, to, count }) => "" + from + "-" + to + " z " + (count==-1?"więcej niż " + to:count) + ""}
-                  />
-                </TableFooter>
-              </Table>
-            </TableContainer>
-          </div>
-          <div className='rowC'>
-            <a class="App-panel">
+                    })}
+                  </TableBody>
+                  <TableFooter>
+                    <TablePagination
+                      rowsPerPageOptions={[5, 10, 25]}
+                      rowsPerPage={this.state.rowsPerPage}
+                      page={this.state.page}
+                      count={-1}
+                      onChangePage={this.handleChangePage}
+                      onChangeRowsPerPage={this.handleChangeRowsPerPage}
+                      labelDisplayedRows={({ from, to, count }) => "" + from + "-" + to + " z " + (count == -1 ? "więcej niż " + to : count) + ""}
+                    />
+                  </TableFooter>
+                </Table>
+              </TableContainer>
+            </div>
+            <div className='rowC'>
+              <a class="App-panel">
                 <h2>INPUT XML</h2>
-                  <code>{this.state.input}</code>
-            </a>
-            <a class="App-panel">
+                <code>{this.state.input}</code>
+              </a>
+              <a class="App-panel">
                 <h2>OUTPUT XML</h2>
-                  <code>{this.state.output}</code>
-            </a>
+                <code>{this.state.output}</code>
+              </a>
+            </div>
           </div>
-        </div>
         </ThemeProvider>
       </React.Fragment>
     );
